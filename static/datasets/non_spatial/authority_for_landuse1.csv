@@ -1,0 +1,19 @@
+parcel_id,authorityname,restriction,restriction_term,zone,landuse
+17516,ZMM,monument (balancing rocks),unlimited,High Density,National Parks
+16749,CAZ,flightzone,unlimited,Low Density,Agriculture
+16761,Epworth Local Board,residential,limited,High Density,Residential
+16760,ZMM,monument (balancing rocks),unlimited,Factories,Residential
+16748,ZMM,monument (balancing rocks),unlimited,Low Density,Recreational
+16759,ZMM,monument (balancing rocks),unlimited,Low Density,Recreational
+16758,Epworth Local Board,residential,limited,High Density,Industrial
+16757,EMA,wetland,unlimited,Factories,Agriculture
+16756,EMA,river basin,unlimited,Medium Density,National Parks
+16752,ZMM,monument (balancing rocks),unlimited,High Density,Recreational
+16747,CAZ,flightzone,unlimited,Low Density,Agriculture
+16750,ZMM,monument (balancing rocks),unlimited,Low Density,Recreational
+17043,EMA,river basin,unlimited,Medium Density,National Parks
+16745,Epworth Local Board,residential,limited,High Density,Residential
+16762,ZMM,monument (balancing rocks),unlimited,Factories,Residential
+16746,ZMM,monument (balancing rocks),unlimited,Low Density,Recreational
+16763,Epworth Local Board,residential,limited,High Density,Residential
+16764,EMA,wetland,unlimited,Factories,Agriculture

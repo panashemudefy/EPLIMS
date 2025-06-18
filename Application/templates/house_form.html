@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Add House with Well</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+  <div class="card shadow">
+    <div class="card-header bg-primary text-white">
+      <h3 class="mb-0">Add House with Well</h3>
+    </div>
+    <div class="card-body">
+      <form method="POST" novalidate>
+        {% csrf_token %}
+        
+        {% for field in form %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}
+              <div class="form-text">{{ field.help_text }}</div>
+            {% endif %}
+            {% if field.errors %}
+              <div class="text-danger small">{{ field.errors|striptags }}</div>
+            {% endif %}
+          </div>
+        {% endfor %}
+
+        <div class="mb-3">
+          <button type="button" class="btn btn-outline-secondary" onclick="getLocation()">📍 Get Current Location</button>
+        </div>
+
+        <button type="submit" class="btn btn-success">Submit</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  function getLocation() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(function(position) {
+        const latField = document.getElementById("id_latitude");
+        const lonField = document.getElementById("id_longitude");
+        latField.value = position.coords.latitude.toFixed(6);
+        lonField.value = position.coords.longitude.toFixed(6);
+      }, function(error) {
+        alert("Location access denied or unavailable.");
+      });
+    } else {
+      alert("Geolocation is not supported by this browser.");
+    }
+  }
+</script>
+
+</body>
+</html>

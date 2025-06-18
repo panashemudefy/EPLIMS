@@ -1,0 +1,1528 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Parcel Dashboard - Spatial Softworks</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+
+  <style>
+    :root {
+      --primary-color: #2563eb;
+      --primary-hover: #1d4ed8;
+      --secondary-color: #4b5563;
+      --background: #f8fafc;
+      --panel-bg: #ffffff;
+      --text-light: #f9fafb;
+      --text-dark: #1f2937;
+      --accent: #3b82f6;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --border-radius: 12px;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background-color: var(--background);
+      color: var(--text-dark);
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #map {
+      height: 100%;
+      width: 100%;
+      z-index: 1;
+    }
+
+    .app-header {
+      background-color: var(--panel-bg);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: var(--shadow-sm);
+      z-index: 1000;
+      position: relative;
+    }
+
+    .app-title {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .app-title h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0;
+      color: var(--text-dark);
+    }
+
+    .app-logo {
+      width: 32px;
+      height: 32px;
+    }
+
+    .app-controls {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .dashboard-container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .sidebar {
+      width: 350px;
+      background-color: var(--panel-bg);
+      border-right: 1px solid #e5e7eb;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      overflow-y: auto;
+      z-index: 10;
+      transition: var(--transition);
+      box-shadow: var(--shadow);
+    }
+
+    .sidebar.collapsed {
+      transform: translateX(-100%);
+      width: 0;
+      padding: 0;
+      border: none;
+    }
+
+    .sidebar-toggle {
+      position: absolute;
+      top: 0.7rem;
+      left: 3rem;
+      background: var(--panel-bg);
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 1000;
+      box-shadow: var(--shadow);
+      transition: var(--transition);
+    }
+
+    .sidebar-toggle:hover {
+      background-color: var(--primary-color);
+      color: white;
+    }
+
+    .panel {
+      background-color: var(--panel-bg);
+      border-radius: var(--border-radius);
+      padding: 1.25rem;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid gainsboro;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .panel-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0;
+      color: var(--text-dark);
+    }
+
+    .search-container {
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid #e5e7eb;
+      border-radius: var(--border-radius);
+      font-size: 0.875rem;
+      transition: var(--transition);
+      background-color: #f9fafb;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      background-color: white;
+    }
+
+    .search-icon {
+      position: absolute;
+      right: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+    }
+
+    #suggestBox {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 0 0 var(--border-radius) var(--border-radius);
+      max-height: 300px;
+      overflow-y: auto;
+      z-index: 100;
+      box-shadow: var(--shadow-md);
+      display: none;
+    }
+
+    #suggestBox div {
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: 0.875rem;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    #suggestBox div:last-child {
+      border-bottom: none;
+    }
+
+    #suggestBox div.active,
+    #suggestBox div:hover {
+      background-color: var(--primary-color);
+      color: white;
+    }
+
+    .btn {
+      padding: 0.75rem 1rem;
+      border: none;
+      border-radius: var(--border-radius);
+      font-weight: 500;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: var(--transition);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-primary {
+      background-color: var(--primary-color);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background-color: #e5e7eb;
+      color: var(--text-dark);
+    }
+
+    .btn-secondary:hover {
+      background-color: #d1d5db;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+    }
+
+    .stat-card {
+      background-color: #f9fafb;
+      border-radius: var(--border-radius);
+      padding: 0.3rem;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary-color);
+      margin: 0.25rem 0;
+    }
+
+    .stat-label {
+      font-size: 0.5rem;
+      font-weight: 800;
+      color: var(--secondary-color);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .legend {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+    }
+
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+    }
+
+    .parcel-details {
+      display: none;
+      position: absolute;
+      bottom: 1rem;
+      right: 1rem;
+      width: 400px;
+      background: white;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow-lg);
+      z-index: 1000;
+      padding: 1.25rem;
+      max-height: 80vh;
+      overflow-y: auto;
+      z-index: 1000;
+    }
+
+    .parcel-details.active {
+      display: block;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+      font-size: 0.875rem;
+    }
+
+    .detail-label {
+      font-weight: 500;
+      color: var(--secondary-color);
+      min-width: 120px;
+    }
+
+    .detail-value {
+      font-weight: 400;
+      text-align: right;
+      max-width: 60%;
+      word-break: break-word;
+    }
+
+    .detail-section {
+      margin: 1rem 0;
+      padding-top: 1rem;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .detail-section-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: var(--text-dark);
+    }
+
+    .close-details {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #9ca3af;
+      font-size: 1rem;
+    }
+
+    .close-details:hover {
+      color: var(--danger);
+    }
+
+    .leaflet-popup-content {
+      font-size: 0.875rem;
+      line-height: 1.5;
+      min-width: 200px;
+    }
+
+    .leaflet-popup-content-wrapper {
+      border-radius: var(--border-radius);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: var(--text-dark);
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow-lg);
+      z-index: 1100;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .status-active {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+
+    .status-overdue {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+
+    .status-expired {
+      background-color: #fef3c7;
+      color: #92400e;
+    }
+
+    .status-condemned {
+      background-color: #e5e7eb;
+      color: #1f2937;
+    }
+
+    .dispute-status {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .dispute-pending {
+      background-color: #fef3c7;
+      color: #92400e;
+    }
+
+    .dispute-solved {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+
+    .dispute-unsolvable {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+
+    .layer-key {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: var(--border-radius);
+      padding: 1rem;
+      box-shadow: var(--shadow);
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .layer-key h4 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1rem;
+    }
+
+    .dark-mode {
+      background-color: #1f2937; /* Dark background */
+      color: #f9fafb; /* Light text color */
+    }
+
+    .dark-mode .app-header {
+      background-color: #374151; /* Dark header */
+    }
+
+    .dark-mode .panel {
+      background-color: #4b5563; /* Dark panel */
+    }
+
+    .dark-mode .btn-secondary {
+      background-color: #6b7280; /* Dark button */
+      color: white; /* Light button text */
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        position: absolute;
+        height: 100%;
+        box-shadow: var(--shadow-lg);
+      }
+      
+      .parcel-details {
+        width: calc(100% - 2rem);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-header">
+    <div class="app-title">
+      <img src="{% static 'logo/eplims.png' %}" alt="Logo" class="app-logo">
+      <h1>Parcel Dashboard</h1>
+    </div>
+    <div class="app-controls">
+    <a href="{% url 'add-house' %}" class="btn btn-secondary">
+      <i class="fas fa-plus-circle"></i> Add Data
+    </a>
+    <button class="btn btn-secondary" id="toggleDarkMode">
+      <i class="fas fa-adjust"></i> Settings
+    </button>
+    <a href="admin/" class="btn btn-secondary">
+      <i class="fas fa-user"></i> Account
+    </a>
+    <select id="baseMapSelect" class="btn btn-secondary">
+      <option value="osm">OSM Map</option>
+      <option value="esri">Esri Imagery</option>
+      <option value="carto">CARTO Positron</option>
+      <option value="stadiaOutdoors">Stadia Outdoors</option>
+      <option value="stadiaDark">Stadia Dark</option>
+    </select>
+  </div>
+  </div>
+
+  <div class="dashboard-container">
+    <button class="sidebar-toggle" id="sidebarToggle" style="border: 1px solid gainsboro;">
+      <i class="fas fa-times"></i>
+    </button>
+
+    <div class="sidebar" id="sidebar">
+      <br>
+      <div class="panel">
+        <div class="search-container">
+          <input type="text" id="searchBox" class="search-input" placeholder="Search parcel ID..." />
+          <i class="fas fa-search search-icon"></i>
+          <div id="suggestBox"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h3 class="panel-title">Parcel Statistics</h3>
+          <span class="badge">Updated today</span>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Parcels</div>
+            <div class="stat-value" id="totalParcels">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Residential</div>
+            <div class="stat-value" id="residentialParcels">0</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">Industrial</div>
+            <div class="stat-value" id="industrialParcels">0</div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-label">Agricultural</div>
+            <div class="stat-value" id="agriculturalParcels">0</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">Recreational</div>
+            <div class="stat-value" id="recreationalParcels">0</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">Disputed</div>
+            <div class="stat-value" id="disputedParcels">0</div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h3 class="panel-title">Land Use Legend</h3>
+        </div>
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: #1f78b4;"></div>
+            <span>Residential</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: #33a02c;"></div>
+            <span>Agriculture</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: #e31a1c;"></div>
+            <span>Industrial</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: #ff7f00;"></div>
+            <span>Recreational</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: #6a3d9a;"></div>
+            <span>National Parks</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: #b2df8a;"></div>
+            <span>Other</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h3 class="panel-title">Actions</h3>
+        </div>
+        <button id="exportBtn" class="btn btn-primary" style="width: 100%; margin-bottom: 0.75rem;">
+          <i class="fas fa-file-export"></i> Export GeoJSON
+        </button>
+        <button id="printBtn" class="btn btn-secondary" style="width: 100%;">
+          <i class="fas fa-print"></i> Print Map Layout
+        </button>
+      </div>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="parcel-details" id="parcelDetails">
+      <button class="close-details" id="closeDetails">
+        <i class="fas fa-times"></i>
+      </button>
+      <h3 class="panel-title">Parcel Details</h3>
+      
+      <div class="detail-section">
+        <div class="detail-row">
+          <span class="detail-label">Parcel ID:</span>
+          <span class="detail-value" id="detail-id">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Location:</span>
+          <span class="detail-value" id="detail-location">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Land Use:</span>
+          <span class="detail-value" id="detail-landuse">Residential</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Zone:</span>
+          <span class="detail-value" id="detail-zone">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Area:</span>
+          <span class="detail-value" id="detail-area">N/A</span>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Ownership</div>
+        <div class="detail-row">
+          <span class="detail-label">Owner:</span>
+          <span class="detail-value" id="detail-owner">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Owner ID:</span>
+          <span class="detail-value" id="detail-owner-id">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Email:</span>
+          <span class="detail-value" id="detail-email">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Address:</span>
+          <span class="detail-value" id="detail-address">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Phone:</span>
+          <span class="detail-value" id="detail-phone">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Title Type:</span>
+          <span class="detail-value" id="detail-title-type">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Title Status:</span>
+          <span class="detail-value" id="detail-title-status">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Ownership Type:</span>
+          <span class="detail-value" id="detail-ownership-type">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Ownership Term:</span>
+          <span class="detail-value" id="detail-ownership-term">N/A</span>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Authority & Restrictions</div>
+        <div class="detail-row">
+          <span class="detail-label">Authority:</span>
+          <span class="detail-value" id="detail-authority">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Restriction:</span>
+          <span class="detail-value" id="detail-restriction">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Restriction Term:</span>
+          <span class="detail-value" id="detail-restriction-term">N/A</span>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Survey Information</div>
+        <div class="detail-row">
+          <span class="detail-label">Survey Number:</span>
+          <span class="detail-value" id="detail-survey-number">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Surveyed By:</span>
+          <span class="detail-value" id="detail-surveyor">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Surveyor Email:</span>
+          <span class="detail-value" id="detail-surveyor-email">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Surveyor Phone:</span>
+          <span class="detail-value" id="detail-surveyor-phone">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Method:</span>
+          <span class="detail-value" id="detail-method">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Date Conducted:</span>
+          <span class="detail-value" id="detail-date">N/A</span>
+        </div>
+      </div>
+
+      <div class="detail-section" id="dispute-section">
+        <div class="detail-section-title">Dispute Information</div>
+        <div class="detail-row">
+          <span class="detail-label">Dispute ID:</span>
+          <span class="detail-value" id="detail-dispute-id">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Dispute Type:</span>
+          <span class="detail-value" id="detail-dispute-type">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Status:</span>
+          <span class="detail-value" id="detail-dispute-status">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Ward:</span>
+          <span class="detail-value" id="detail-ward">N/A</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Report Date:</span>
+          <span class="detail-value" id="detail-report-date">N/A</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast">
+      <i class="fas fa-check-circle"></i>
+      <span id="toastMessage">Successfully exported data</span>
+    </div>
+  </div>
+
+  <div id="layerKey" class="layer-key">
+    <h4>Map Layers</h4>
+    <label>
+      <input type="checkbox" id="toggleLanduse" checked />
+      Wetlands
+    </label>
+    <label>
+      <input type="checkbox" id="toggleRivers" checked />
+      Rivers
+    </label>
+    <label>
+      <input type="checkbox" id="toggleRoads" checked />
+      Roads
+    </label>
+    <label>
+      <input type="checkbox" id="toggleWells" checked />
+      Wells
+    </label>
+    <label>
+      <input type="checkbox" id="toggleContours" />
+      Contours
+    </label>
+  </div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+ 
+  <script>
+    // Initialize map with better defaults
+    const map = L.map('map', {
+      zoomAnimation: true,
+      fadeAnimation: true,
+      markerZoomAnimation: true,
+      inertia: true,
+      easeLinearity: 0.35,
+      preferCanvas: true
+    }).setView([-17.888390732674118, 31.172093269668942], 15);   //.setView([-17.896602086292308, 31.164955431803104], 18);  
+
+    // Define base layers
+    var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 20,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);  // Add as the default layer
+
+    var esriImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; <a href="https://www.esri.com">Esri</a> contributors',
+        maxZoom: 17.9
+    });
+
+    var cartoPositron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.carto.com/">CARTO</a> contributors & OpenStreetMap',
+        subdomains: 'abcd',
+        maxZoom: 20
+    });
+
+    var stadiaOutdoors = L.tileLayer('https://tiles.stadiamaps.com/tiles/outdoors/{z}/{x}/{y}{r}.png?api_key=e70d65fd-8cfb-4557-87c3-aee690ca63f6', {
+        attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> contributors',
+        maxZoom: 20
+    });
+
+    var stadiaDark = L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key=e70d65fd-8cfb-4557-87c3-aee690ca63f6', {
+        attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> contributors',
+        maxZoom: 20
+    });
+
+    // Handle base map selection
+    document.getElementById('baseMapSelect').addEventListener('change', function() {
+        const selectedBaseMap = this.value;
+        
+        // Remove all base layers
+        map.eachLayer(layer => {
+            if (layer instanceof L.TileLayer) {
+                map.removeLayer(layer);
+            }
+        });
+        
+        // Add the selected base map
+        if (selectedBaseMap === 'osm') {
+            osmLayer.addTo(map);
+        } else if (selectedBaseMap === 'esri') {
+            esriImagery.addTo(map);
+        } else if (selectedBaseMap === 'carto') {
+            cartoPositron.addTo(map);
+        } else if (selectedBaseMap === 'stadiaOutdoors') {
+            stadiaOutdoors.addTo(map);
+        } else if (selectedBaseMap === 'stadiaDark') {
+            stadiaDark.addTo(map);
+        }
+    });
+
+    // UI Elements
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const parcelDetails = document.getElementById('parcelDetails');
+    const closeDetails = document.getElementById('closeDetails');
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toastMessage');
+    const disputeSection = document.getElementById('dispute-section');
+
+    // Toggle sidebar
+    sidebarToggle.addEventListener('click', () => {
+      sidebar.classList.toggle('collapsed');
+      sidebarToggle.innerHTML = sidebar.classList.contains('collapsed') ? 
+        '<i class="fas fa-bars"></i>' : '<i class="fas fa-times"></i>';
+      
+      // Adjust map width based on sidebar state
+      const mapElement = document.getElementById('map'); // Make sure your map has this ID
+      if (sidebar.classList.contains('collapsed')) {
+        mapElement.style.width = '100%';
+        mapElement.style.left = '0';
+      } else {
+        mapElement.style.width = 'calc(100% - 250px)'; // Adjust 250px to your sidebar's width
+      }
+      
+      // If you're using a map library (like Leaflet or Google Maps), trigger a resize event
+      if (typeof map !== 'undefined' && typeof map.invalidateSize === 'function') {
+        setTimeout(() => map.invalidateSize(), 300);
+      }
+    });
+
+    // Close parcel details
+    closeDetails.addEventListener('click', () => {
+      parcelDetails.classList.remove('active');
+    });
+
+    // Show toast notification
+    function showToast(message, type = 'success') {
+      toastMessage.textContent = message;
+      toast.className = `toast show ${type}`;
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+
+    let parcelLayer;
+    let parcelIndex = [];
+    let parcelStats = {
+      total: 0,
+      residential: 0,
+      industrial: 0,
+      agricultural: 0,
+      disputed: 0,
+      recreational: 0
+    };
+
+    // Declare layer variables globally to enable toggling
+    let contoursLayer, landuseLayer, riversLayer, roadsLayer, wellsLayer;
+
+    // Function to clean and standardize keys
+    function cleanKey(val) {
+      if (val === undefined || val === null) return '';
+      return String(val).trim().toLowerCase().replace(/\s+/g, '_');
+    }
+
+    // Function to create a map from array of objects by parcel_id
+    function createParcelMap(data, keyField = 'parcel_id') {
+      const map = new Map();
+      data.forEach(item => {
+        const key = cleanKey(item[keyField]);
+        if (key) map.set(key, item);
+      });
+      return map;
+    }
+
+    // Load all data files
+    // Load all data files, including new spatial datasets
+    Promise.all([
+      d3.csv("{% static 'datasets/non_spatial/authority_for_landuse.csv' %}"),
+      d3.csv("{% static 'datasets/non_spatial/dispute_data.csv' %}"),
+      d3.csv("{% static 'datasets/non_spatial/ownership_data.csv' %}"),
+      d3.csv("{% static 'datasets/non_spatial/parcel_survey.csv' %}"),
+      d3.csv("{% static 'datasets/non_spatial/transfers.csv' %}"),
+      d3.json("{% static 'datasets/spatial/epworth_stands.geojson' %}"),
+      d3.json("{% static 'datasets/spatial/epworth_contours.geojson' %}"),
+      d3.json("{% static 'datasets/spatial/epworth_wetlands.geojson' %}"),
+      d3.json("{% static 'datasets/spatial/epworth_rivers.geojson' %}"),
+      d3.json("{% static 'datasets/spatial/epworth_roads.geojson' %}"),
+      d3.json("/api/wells/") // wells placeholder
+    ]).then(([authorityData, disputeData, ownershipData, surveyData, transferData, geoData, contoursData, landuseData, riversData, roadsData, wellsData]) => {
+      
+      // 1. First, clean and normalize all dataset fields
+      const cleanData = (data, idField) => {
+        return data.map(item => {
+          const cleaned = {};
+          Object.keys(item).forEach(key => {
+            const cleanKey = key.trim().toLowerCase().replace(/\s+/g, '_');
+            cleaned[cleanKey] = item[key]?.trim();
+          });
+          // Ensure parcel_id is consistently named
+          if (idField && cleaned[idField]) {
+            cleaned.parcel_id = cleaned[idField];
+          }
+          return cleaned;
+        });
+      };
+
+      // Clean all datasets
+      const cleanAuth = cleanData(authorityData, 'parcel_id');
+      const cleanDisp = cleanData(disputeData, 'parcel_id');
+      const cleanOwn = cleanData(ownershipData, 'parcel_id');
+      const cleanSurvey = cleanData(surveyData, 'parcel_id ');
+      const cleanTrans = cleanData(transferData, 'parcel_id ');
+
+      // 2. Create lookup maps with proper error handling
+      const createLookup = (data) => {
+        const map = new Map();
+        data.forEach(item => {
+          if (item.parcel_id) {
+            const pid = cleanKey(item.parcel_id);
+            map.set(pid, item);
+          }
+        });
+        return map;
+      };
+
+      const authMap = createLookup(cleanAuth);
+      const dispMap = createLookup(cleanDisp);
+      const ownMap = createLookup(cleanOwn);
+      const surveyMap = createLookup(cleanSurvey);
+      const transMap = createLookup(cleanTrans);
+
+      // 3. Process GeoJSON features with comprehensive data merging
+      geoData.features.forEach(feature => {
+        const pid = cleanKey(feature.properties.RefName);
+        if (!pid) return;
+
+        feature.properties.parcel_id = pid;
+        parcelIndex.push(pid);
+
+        // Get all related records
+        const auth = authMap.get(pid) || {};
+        const disp = dispMap.get(pid) || {};
+        const own = ownMap.get(pid) || {};
+        const survey = surveyMap.get(pid) || {};
+        const trans = transMap.get(pid) || {};
+
+        // Merge all data with priority to GeoJSON properties
+        feature.properties = {
+          // Keep original GeoJSON properties
+          ...feature.properties,
+          
+          // Merge authority data
+          authorityname: auth.authorityname || feature.properties.authorityname,
+          restriction: auth.restriction || feature.properties.restriction,
+          restriction_term: auth.restriction_term || feature.properties.restriction_term,
+          zone: auth.zone || feature.properties.zone,
+          landuse: auth.landuse || feature.properties.landuse,
+          
+          // Merge dispute data
+          dispute_id: disp.dispute_id,
+          dispute_type: disp.dispute_type,
+          status: disp.status,
+          ward: disp.ward,
+          report_date: disp.report_date,
+          
+          // Merge ownership data
+          first_name: own.first_name,
+          last_name: own.last_name,
+          owner_id: own.owner_id,
+          email: own.email,
+          physicaladress: own.physicaladress,
+          conduct: own.conduct,
+          location: own.location,
+          title_id: own.title_id,
+          title_status: own.title_status,
+          title_type: own.title_type,
+          ownershiptype: own.ownershiptype,
+          ownershipterm: own.ownershipterm,
+          
+          // Merge survey data
+          surveynumber: survey.surveynumber,
+          surveyorname: survey.surveyorname,
+          surveyor_email: survey.email,
+          surveyor_phone: survey.conduct,
+          method: survey.method,
+          dateconducted: survey.dateconducted,
+          
+          // Merge transfer data
+          transfer_id: trans.transfer_id,
+          fromowner: trans.fromowner,
+          toowner: trans.toowner,
+          transfer_type: trans.transfer_type,
+          transfer_date: trans.date
+        };
+
+        // Count statistics
+        const landuse = feature.properties.landuse?.toLowerCase() || '';
+        if (landuse.includes('residential')) parcelStats.residential++;
+        if (landuse.includes('commercial')) parcelStats.commercial++;
+        if (landuse.includes('industrial')) parcelStats.industrial++;
+        if (landuse.includes('agricultural') || landuse.includes('agriculture')) parcelStats.agricultural++;
+        if (landuse.includes('recreational')) parcelStats.recreational++;
+
+        if (feature.properties.dispute_type) {
+          parcelStats.disputed++;
+        }
+      });
+
+      parcelStats.total = geoData.features.length;
+      updateStats();
+
+      function getColor(landuse) {
+        switch ((landuse || '').toLowerCase()) {
+          case 'residential': return '#1f78b4';
+          case 'agriculture': 
+          case 'agricultural': return '#33a02c';
+          case 'industrial': return '#e31a1c';
+          case 'commercial': return '#ff7f00';
+          case 'recreational': return 'orange';
+          case 'national parks': return '#6a3d9a';
+          default: return '#FFC107';
+        }
+      }
+
+      function getTitleStatusBadge(status) {
+        if (!status) return '';
+        const lowerStatus = status.toLowerCase();
+        if (lowerStatus.includes('active')) return `<span class="status-badge status-active">${status}</span>`;
+        if (lowerStatus.includes('overdue')) return `<span class="status-badge status-overdue">${status}</span>`;
+        if (lowerStatus.includes('expired')) return `<span class="status-badge status-expired">${status}</span>`;
+        if (lowerStatus.includes('condemned')) return `<span class="status-badge status-condemned">${status}</span>`;
+        return status;
+      }
+
+      function getDisputeStatusBadge(status) {
+        if (!status) return '';
+        const lowerStatus = status.toLowerCase();
+        if (lowerStatus.includes('pending')) return `<span class="dispute-status dispute-pending">${status}</span>`;
+        if (lowerStatus.includes('solved')) return `<span class="dispute-status dispute-solved">${status}</span>`;
+        if (lowerStatus.includes('unsolvable')) return `<span class="dispute-status dispute-unsolvable">${status}</span>`;
+        return status;
+      }
+      // Add parcel Layer
+
+      document.getElementById('exportBtn').addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify(geoData)], { type: 'application/json' });
+        saveAs(blob, 'enriched_parcels.geojson');
+        showToast('GeoJSON exported successfully');
+      });
+
+      document.getElementById('printBtn').addEventListener('click', () => {
+        window.print();
+        showToast('Preparing map for printing...');
+      });
+
+      // Function to add additional GeoJSON layers to the map
+      function addGeoJsonLayer(data, color, popupContent) {
+        return L.geoJSON(data, {
+          style: () => ({
+            color: color,
+            weight: 1,
+            opacity: 0.9,
+            fillOpacity: 0.5
+          }),
+          onEachFeature: (feature, layer) => {
+            layer.bindPopup(popupContent(feature.properties));
+          }
+        });
+      }
+
+      // Add contour layer
+      const contoursLayer = addGeoJsonLayer(contoursData, '#a86523', (props) => `
+        <strong>Contour Elevation:</strong> ${props.Elevation || 'N/A'}
+      `);
+      //contoursLayer.addTo(map);
+
+      // Add land use layer
+      const landuseLayer = addGeoJsonLayer(landuseData, '#66ff66', (props) => `
+        <strong>Wetland ID:</strong> ${props.Id || 'N/A'}
+      `);
+      landuseLayer.addTo(map);
+
+      // Add rivers layer
+      const riversLayer = addGeoJsonLayer(riversData, '#0000ff', (props) => `
+        <strong>River Name:</strong> ${props.Layer || 'N/A'}
+      `);
+      riversLayer.addTo(map);
+
+      // Create the parcel layer with all features
+      parcelLayer = L.geoJSON(geoData, {
+        style: feature => ({
+          color: '#fff',
+          weight: 1,
+          fillColor: getColor(feature.properties.landuse),
+          fillOpacity: 0.7
+        }),
+        onEachFeature: (feature, layer) => {
+          const p = feature.properties;
+          
+          // Add hover effects
+          layer.on({
+            mouseover: () => {
+              layer.setStyle({
+                weight: 3,
+                fillOpacity: 0.9
+              });
+              layer.bringToFront();
+            },
+            mouseout: () => {
+              parcelLayer.resetStyle(layer);
+            },
+            click: () => {
+              showParcelDetails(p, feature);
+              map.fitBounds(layer.getBounds(), { 
+                maxZoom: 25,
+                padding: [50, 50]
+              });
+            }
+          });
+
+          const popup = L.popup({
+            maxWidth: 300,
+            className: 'custom-popup'
+          }).setContent(`
+            <div style="font-size: 0.875rem;">
+              <h4 style="margin: 0 0 0.5rem 0; color: var(--primary-color);">${p.parcel_id || 'N/A'}</h4>
+              <p style="margin: 0.25rem 0;"><strong>Land Use:</strong> ${p.landuse || 'N/A'}</p>
+              <p style="margin: 0.25rem 0;"><strong>Owner:</strong> ${p.first_name || ''} ${p.last_name || ''}</p>
+              <p style="margin: 0.25rem 0;"><strong>Ownership Status:</strong> ${getTitleStatusBadge(p.title_status) || 'N/A'}</p>
+              ${p.dispute_type ? `<p style="margin: 0.25rem 0; color: var(--danger);"><strong>Dispute:</strong> ${p.dispute_type} (${getDisputeStatusBadge(p.status)})</p>` : ''}
+              <button onclick="event.stopPropagation(); document.querySelectorAll('.parcel-details')[0].classList.add('active');" 
+                style="margin-top: 0.5rem; padding: 0.25rem 0.5rem; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer;">
+                View Details
+              </button>
+            </div>
+          `);
+
+          layer.bindPopup(popup);
+        }
+      }).addTo(map);
+
+      setupAutoSuggest(parcelIndex);
+
+      // Add roads layer
+      const roadsLayer = addGeoJsonLayer(roadsData, '#2a4759', (props) => `
+        <strong>Road Name:</strong> ${props.Layer || 'N/A'}
+      `);
+      roadsLayer.addTo(map);
+
+      // Add wells layer
+      /*const wellsLayer = addGeoJsonLayer(wellsData, '#ff0066', (props) => `
+        <strong>Well ID:</strong> ${props.well_id || 'N/A'}
+      `);
+      wellsLayer//.addTo(map);*/
+
+      // Function to add wells layer
+      const wellsLayer = L.geoJSON(wellsData, {
+        pointToLayer: (feature, latlng) => {
+          return L.circleMarker(latlng, {
+            radius: 4, // size of the circle
+            fillColor: feature.properties.is_potable ? '#2ecc71' : '#e74c3c', // green if potable, red if not
+            color: '#555', // border color
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8
+          });
+        },
+        onEachFeature: (feature, layer) => {
+          const properties = feature.properties;
+          const popupContent = `
+            <strong>Address:</strong> ${properties.address || 'N/A'}<br>
+            <strong>Owner Name:</strong> ${properties.owner_name || 'N/A'}<br>
+            <strong>Contact Number:</strong> ${properties.contact_number || 'N/A'}<br>
+            <strong>Well Depth:</strong> ${properties.well_depth || 'N/A'} m<br>
+            <strong>Well Diameter:</strong> ${properties.well_diameter || 'N/A'} cm<br>
+            <strong>Water pH:</strong> ${properties.water_ph !== null ? properties.water_ph : 'N/A'}<br>
+            <strong>Is Potable:</strong> ${properties.is_potable ? 'Yes' : 'No'}<br>
+            <strong>Daily Yield:</strong> ${properties.daily_yield || 'N/A'} L<br>
+          `;
+          layer.bindPopup(popupContent);
+        }
+      });
+
+      // Add wells layer to the map
+      wellsLayer.addTo(map);
+
+
+      //create the layersMap after all layers are initialized
+      const layersMap = {
+        contours: contoursLayer,
+        landuse: landuseLayer,
+        rivers: riversLayer,
+        roads: roadsLayer,
+        wells: wellsLayer
+      };
+
+
+
+      // Add event listeners for the checkboxes
+      document.getElementById('toggleContours').addEventListener('change', function() {
+        if (this.checked) {
+          map.addLayer(layersMap.contours);
+        } else {
+          map.removeLayer(layersMap.contours);
+        }
+      });
+
+      document.getElementById('toggleLanduse').addEventListener('change', function() {
+        if (this.checked) {
+          map.addLayer(layersMap.landuse);
+        } else {
+          map.removeLayer(layersMap.landuse);
+        }
+      });
+
+      document.getElementById('toggleRivers').addEventListener('change', function() {
+        if (this.checked) {
+          map.addLayer(layersMap.rivers);
+        } else {
+          map.removeLayer(layersMap.rivers);
+        }
+      });
+
+      document.getElementById('toggleRoads').addEventListener('change', function() {
+        if (this.checked) {
+          map.addLayer(layersMap.roads);
+        } else {
+          map.removeLayer(layersMap.roads);
+        }
+      });
+
+      document.getElementById('toggleWells').addEventListener('change', function() {
+        if (this.checked) {
+          map.addLayer(layersMap.wells);
+        } else {
+          map.removeLayer(layersMap.wells);
+        }
+      });
+
+      
+
+    }).catch(error => {
+      console.error("Data loading error:", error);
+      showToast('Failed to load datasets', 'error');
+    });
+
+    // Function to calculate area in square meters
+    function calculateArea(feature) {
+      if (!feature || !feature.geometry || feature.geometry.type !== 'Polygon') {
+        return null;
+      }
+
+      // Using Turf.js for accurate area calculation (you'll need to include Turf.js)
+      if (typeof turf !== 'undefined') {
+        return turf.area(feature);
+      }
+
+      // Fallback simple calculation (less accurate)
+      const coords = feature.geometry.coordinates[0];
+      let area = 0;
+      const n = coords.length;
+      
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        const xi = coords[i][0];
+        const yi = coords[i][1];
+        const xj = coords[j][0];
+        const yj = coords[j][1];
+        
+        area += xi * yj;
+        area -= xj * yi;
+      }
+      
+      area = Math.abs(area) / 2;
+      
+      // Convert from degrees to meters (very rough approximation)
+      // This is not accurate for large areas or areas far from equator
+      const METERS_PER_DEGREE = 111320;
+      return area * METERS_PER_DEGREE * METERS_PER_DEGREE;
+    }
+
+    function setupAutoSuggest(parcelIds) {
+      const searchInput = document.getElementById('searchBox');
+      const suggestBox = document.getElementById('suggestBox');
+
+      searchInput.addEventListener('input', () => {
+        const query = searchInput.value.trim().toLowerCase();
+        suggestBox.innerHTML = '';
+        
+        if (query.length === 0) {
+          suggestBox.style.display = 'none';
+          return;
+        }
+        
+        const matches = parcelIds
+          .filter(pid => pid.includes(query))
+          .slice(0, 10);
+          
+        if (matches.length === 0) {
+          suggestBox.style.display = 'none';
+          return;
+        }
+        
+        matches.forEach(match => {
+          const div = document.createElement('div');
+          div.textContent = match;
+          div.addEventListener('click', () => {
+            searchInput.value = match;
+            suggestBox.style.display = 'none';
+            zoomToParcel(match);
+          });
+          suggestBox.appendChild(div);
+        });
+        
+        suggestBox.style.display = 'block';
+      });
+
+      searchInput.addEventListener('keydown', (e) => {
+        const active = suggestBox.querySelector('.active');
+        const items = suggestBox.querySelectorAll('div');
+        
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (active) {
+            const next = active.nextElementSibling || items[0];
+            active.classList.remove('active');
+            next.classList.add('active');
+          } else if (items.length > 0) {
+            items[0].classList.add('active');
+          }
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (active) {
+            const prev = active.previousElementSibling || items[items.length - 1];
+            active.classList.remove('active');
+            prev.classList.add('active');
+          }
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (active) {
+            active.click();
+          } else {
+            zoomToParcel(searchInput.value.trim().toLowerCase());
+            suggestBox.style.display = 'none';
+          }
+        }
+      });
+
+      // Close suggestions when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !suggestBox.contains(e.target)) {
+          suggestBox.style.display = 'none';
+        }
+      });
+    }
+
+    function zoomToParcel(query) {
+      let found = false;
+      parcelLayer.eachLayer(layer => {
+        const pid = (layer.feature.properties.parcel_id || '').toLowerCase();
+        if (pid === query) {
+          found = true;
+          map.fitBounds(layer.getBounds(), { 
+            maxZoom: 17,
+            padding: [50, 50]
+          });
+          layer.openPopup();
+          showParcelDetails(layer.feature.properties);
+        }
+      });
+      
+      if (!found) {
+        showToast('Parcel ID not found', 'error');
+      }
+    }
+
+    // 4. Enhanced showParcelDetails with fallbacks and validation
+    function showParcelDetails(p, feature) {
+
+        // Calculate area if feature geometry is available
+        let areaValue = p.area ? `${p.area} sqm` : 'Basic'; // First try to use existing area property
+    
+        // Only calculate if feature exists and doesn't already have an area
+        if (feature && feature.geometry && !p.area) {
+            const area = calculateArea(feature);
+            if (area) {
+                // Format area - show in hectares if > 10,000 sqm
+                if (area > 10000) {
+                    areaValue = `${(area / 10000).toFixed(2)} ha (${Math.round(area)} sqm)`;
+                } else {
+                    areaValue = `${Math.round(area)} sqm`;
+                }
+            }
+        }
+
+        // Helper function to safely get values
+        const getValue = (val, fallback = 'N/A') => {
+          return (val !== undefined && val !== null && val !== '') ? val : fallback;
+        };
+
+        // Basic details
+        document.getElementById('detail-id').textContent = getValue(p.parcel_id);
+        document.getElementById('detail-location').textContent = getValue(p.location);
+        document.getElementById('detail-landuse').textContent = getValue(p.landuse) || 'Residential';
+        //document.getElementById('detail-zone').textContent = getValue(p.zone);
+        document.getElementById('detail-area').textContent = areaValue;
+        
+        // Ownership details
+        document.getElementById('detail-owner').textContent = 
+          `${getValue(p.first_name, '')} ${getValue(p.last_name, '')}`.trim() || 'N/A';
+        document.getElementById('detail-owner-id').textContent = getValue(p.owner_id);
+        document.getElementById('detail-email').textContent = getValue(p.email);
+        document.getElementById('detail-address').textContent = getValue(p.physicaladress);
+        document.getElementById('detail-phone').textContent = getValue(p.conduct);
+        document.getElementById('detail-title-type').textContent = getValue(p.title_type);
+        document.getElementById('detail-title-status').innerHTML = getValue(p.title_status);
+        document.getElementById('detail-ownership-type').textContent = getValue(p.ownershiptype);
+        document.getElementById('detail-ownership-term').textContent = getValue(p.ownershipterm);
+        
+        // Authority & Restrictions
+        document.getElementById('detail-authority').textContent = getValue(p.authorityname);
+        document.getElementById('detail-restriction').textContent = getValue(p.restriction);
+        document.getElementById('detail-restriction-term').textContent = getValue(p.restriction_term);
+        
+        // Survey Information
+        document.getElementById('detail-survey-number').textContent = getValue(p.surveynumber);
+        document.getElementById('detail-surveyor').textContent = getValue(p.surveyorname);
+        document.getElementById('detail-surveyor-email').textContent = getValue(p.surveyor_email);
+        document.getElementById('detail-surveyor-phone').textContent = getValue(p.surveyor_phone);
+        document.getElementById('detail-method').textContent = getValue(p.method);
+        document.getElementById('detail-date').textContent = getValue(p.dateconducted);
+        
+        // Dispute Information
+        if (p.dispute_id || p.dispute_type) {
+          disputeSection.style.display = 'block';
+          document.getElementById('detail-dispute-id').textContent = getValue(p.dispute_id);
+          document.getElementById('detail-dispute-type').textContent = getValue(p.dispute_type);
+          document.getElementById('detail-dispute-status').innerHTML = getValue(p.status);
+          document.getElementById('detail-ward').textContent = getValue(p.ward);
+          document.getElementById('detail-report-date').textContent = getValue(p.report_date);
+        } else {
+          disputeSection.style.display = 'none';
+        }
+        
+        parcelDetails.classList.add('active');
+      }
+
+    function updateStats() {
+      document.getElementById('totalParcels').textContent = parcelStats.total;
+      document.getElementById('residentialParcels').textContent = parcelStats.residential;
+      document.getElementById('disputedParcels').textContent = parcelStats.disputed;
+
+      document.getElementById('industrialParcels').textContent = parcelStats.industrial;
+      document.getElementById('agriculturalParcels').textContent = parcelStats.agricultural;
+      document.getElementById('recreationalParcels').textContent = parcelStats.recreational;
+    }
+
+    document.getElementById('toggleDarkMode').addEventListener('click', () => {
+      document.body.classList.toggle('dark-mode');
+    });
+
+  </script>
+</body>
+</html>
